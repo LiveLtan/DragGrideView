@@ -7,7 +7,6 @@ import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.TypedArray;
-import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
@@ -24,7 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Desc:
+ * Desc: grid view can drag, to switch tht to item child
  * <p>
  * Modified list:
  * <p>
@@ -35,9 +34,14 @@ public class DragGridView extends FrameLayout {
 
     private static final boolean DEBUG_CIRCLE = false;
     private ImageView mDragImg;
-
     private GridView mDragGridView;
     private ListAdapter mGridAdapter;
+
+    private boolean mIsAnimPlaying;
+    private int mActionDownX, mActionDownY;
+    private int mDragViewLeft, mDragViewTop;
+    private int mMoveDistanceX, mMoveDistanceY;
+    private int mDragIndex = -1;
 
     public DragGridView(Context context) {
         this(context, null);
@@ -55,7 +59,7 @@ public class DragGridView extends FrameLayout {
 
         TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.DragGridView, defStyleAttr, 0);
         int columns = ta.getInt(R.styleable.DragGridView_android_numColumns, 2);
-        // for press state
+        // for press state, should be transparent
         final Drawable selector = ta.getDrawable(R.styleable.DragGridView_android_listSelector);
         ta.recycle();
 
@@ -70,7 +74,6 @@ public class DragGridView extends FrameLayout {
     }
 
     private void init(Context context, int columns) {
-        mDragViewShowPoint = new Point();
     }
 
     private void initDragViews() {
@@ -102,40 +105,27 @@ public class DragGridView extends FrameLayout {
         return rectInParent;
     }
 
-    private void generateDragWH() {
+    private void measureDragView() {
         if (mDragImg.getMeasuredWidth() <= 0 || mDragImg.getMeasuredHeight() <= 0) {
             int wSpec = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
             int hSpec = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
             mDragImg.measure(wSpec, hSpec);
-            Log.d(TAG, "generateDragWH: width:" + mDragImg.getMeasuredWidth() + ", height:" + mDragImg.getMeasuredHeight());
+            Log.d(TAG, "measureDragView: width:" + mDragImg.getMeasuredWidth() + ", height:" + mDragImg.getMeasuredHeight());
         }
     }
 
-    private Point mDragViewShowPoint;
-
-    @Override
-    public boolean onTouchEvent(MotionEvent ev) {
-
-        return super.onTouchEvent(ev);
-    }
-
-    private Point updateDragStartPoint(int touchIndex, int touchX, int touchY) {
-        Point p = mDragViewShowPoint;
+    private void updateDragViewPosition(int touchIndex, int touchX, int touchY) {
         View touchView = mDragGridView.getChildAt(touchIndex);
-        //int dragWidth = mDragImg.getWidth() < 0 ? mDragImg.getMeasuredWidth() : mDragImg.getHeight();
+        // use measure w:h inCase width = 0
         int dragWidth = mDragImg.getMeasuredWidth();
         int dragHeight = mDragImg.getMeasuredHeight();
-        p.x = touchView.getLeft() + (touchView.getWidth() - dragWidth) / 2;
-        //p.y = touchY - dragHeight; // show view at touch point
-        p.y = touchView.getTop() + (touchView.getHeight() - dragHeight) / 2;// child center...
-        if (p.y <= 0) {
-            p.y = 0;
+        mDragViewLeft = touchView.getLeft() + (touchView.getWidth() - dragWidth) / 2;
+        //top = touchY - dragHeight; // show view at touch point
+        mDragViewTop = touchView.getTop() + (touchView.getHeight() - dragHeight) / 2;
+        if (mDragViewTop <= 0) {
+            mDragViewTop = 0;
         }
-        dragViewStartX = p.x;
-        dragViewStartY = p.y;
-        Log.d(TAG, "updateDragStartPoint: down x:" + touchX + ", y:" + touchY + "| position x:" + p.x + ", y:" + p.y);
-        Log.d(TAG, "updateDragStartPoint: l:" + mDragImg.getLeft() + ", t:" + mDragImg.getTop());
-        return p;
+        Log.d(TAG, "updateDragViewPosition: down x:" + touchX + ", y:" + touchY + " | position x:" + mDragViewLeft + ", y:" + mDragViewTop);
     }
 
     private int getChildIndex(int targetX, int targetY) {
@@ -152,10 +142,10 @@ public class DragGridView extends FrameLayout {
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         super.onLayout(changed, l, t, r, b);
-        int dragViewL = mDragViewShowPoint.x;
-        int dragViewT = mDragViewShowPoint.y;
+        int dragViewL = mDragViewLeft + mMoveDistanceX;
+        int dragViewT = mDragViewTop + mMoveDistanceY;
         if (DEBUG_CIRCLE) {
-            Log.d(TAG, "onLayout: ");
+            Log.d(TAG, "onLayout: dragViewL:" + dragViewL + ", dragViewT:" + dragViewT);
         }
         mDragImg.layout(dragViewL, dragViewT, mDragImg.getWidth() + dragViewL, mDragImg.getHeight() + dragViewT);
     }
@@ -164,7 +154,7 @@ public class DragGridView extends FrameLayout {
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         if (DEBUG_CIRCLE) {
-            Log.d(TAG, "onMeasure: ");
+            Log.d(TAG, "onMeasure: called before layout");
         }
     }
 
@@ -173,23 +163,22 @@ public class DragGridView extends FrameLayout {
         if(mIsAnimPlaying) {
             return false;
         }
-        //Log.d(TAG, "dispatchTouchEvent: ev:" + ev);
         int currentTouchX = (int) ev.getX();
         int currentTouchY = (int) ev.getY();
-
         switch (ev.getAction() & MotionEvent.ACTION_MASK) {
             case MotionEvent.ACTION_DOWN:
-                downX = (int) ev.getX();
-                downY = (int) ev.getY();
-                int index = getChildIndex(downX, downY);
-                mDragIndex = index;
+                mActionDownX = currentTouchX;
+                mActionDownY = currentTouchY;
+                int index = mDragIndex = getChildIndex(currentTouchX, currentTouchY);
                 if (index > -1) {
                     Object itemData = mGridAdapter.getItem(index);
                     if (itemData instanceof DataObject) {
                         mDragImg.setImageDrawable(((DataObject) itemData).icon);
                     }
-                    generateDragWH();
-                    updateDragStartPoint(index, downX, downY);
+                    // the image resource updated, measure again.
+                    measureDragView();
+                    calculateDxDy(currentTouchX, currentTouchY);
+                    updateDragViewPosition(index, currentTouchX, currentTouchY);
                     mDragImg.setAlpha(1.0f);
                     mDragImg.setVisibility(VISIBLE);
                     requestLayout();
@@ -201,45 +190,32 @@ public class DragGridView extends FrameLayout {
                     break;
                 }
                 onDragEnd(currentTouchX, currentTouchY);
-                //return true;
                 break;
             case MotionEvent.ACTION_MOVE:
                 if(mDragIndex == -1) {
                     break;
                 }
-                onDraging(currentTouchX, currentTouchY);
-                lastTouchX = currentTouchX;
-                lastTouchY = currentTouchY;
-                //return true;
+                onDragging(currentTouchX, currentTouchY);
                 break;
         }
         return super.dispatchTouchEvent(ev);
     }
 
-    private int downX, downY;
-    private int lastTouchX, lastTouchY;
-    private int dragViewStartX, dragViewStartY;
-    private int moveDx, moveDy;
-    private boolean mIsAnimPlaying;
-    private int mDragIndex = -1;
-
     private void calculateDxDy(int touchX, int touchY) {
-        moveDx = touchX - downX;
-        moveDy = touchY - downY;
+        mMoveDistanceX = touchX - mActionDownX;
+        mMoveDistanceY = touchY - mActionDownY;
     }
 
-    private void onDraging(int toX, int toY) {
+    private void onDragging(int toX, int toY) {
         calculateDxDy(toX, toY);
-        mDragViewShowPoint.x = dragViewStartX + moveDx;
-        mDragViewShowPoint.y = dragViewStartY + moveDy;
         requestLayout();
     }
 
     @SuppressLint("ObjectAnimatorBinding")
     private void onDragEnd(int nowX, int nowY) {
-        // moveDx = (nowX - downX)
-        ObjectAnimator dragViewAnimX = ObjectAnimator.ofFloat(mDragImg, "translationX", -(moveDx));
-        ObjectAnimator dragViewAnimY = ObjectAnimator.ofFloat(mDragImg, "translationY", -(moveDy));
+        // mMoveDistanceX = (nowX - mActionDownX)
+        ObjectAnimator dragViewAnimX = ObjectAnimator.ofFloat(mDragImg, "translationX", -(mMoveDistanceX));
+        ObjectAnimator dragViewAnimY = ObjectAnimator.ofFloat(mDragImg, "translationY", -(mMoveDistanceY));
         ObjectAnimator dragViewAnimAlpha = ObjectAnimator.ofFloat(mDragImg, "alpha", 1.f, 0.5f);
 
         List<Animator> animatorList = new ArrayList<Animator>();
