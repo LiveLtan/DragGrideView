@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <integer-array name="icon_drawable_res_id">
+        <item>@drawable/icons8_cloud_checked_48</item>
+        <item>@drawable/icons8_facebook_messenger_48</item>
+        <item>@drawable/icons8_happy_48</item>
+        <item>@drawable/icons8_instagram_48</item>
+        <item>@drawable/icons8_line_48</item>
+        <item>@drawable/icons8_linux_48</item>
+        <item>@drawable/icons8_location_48</item>
+        <item>@drawable/icons8_nfc_48</item>
+        <item>@drawable/icons8_playstore_48</item>
+        <item>@drawable/icons8_rockstar_games_48</item>
+        <item>@drawable/icons8_snapchat_48</item>
+        <item>@drawable/icons8_speaker_48</item>
+        <item>@drawable/icons8_system_report_48</item>
+        <item>@drawable/icons8_whatsapp_48</item>
+    </integer-array>
+
+    <string-array name="icon_drawable_res_name">
+        <item>icons8_cloud_checked_48</item>
+        <item>icons8_facebook_messenger_48</item>
+        <item>icons8_happy_48</item>
+        <item>icons8_instagram_48</item>
+        <item>icons8_line_48</item>
+        <item>icons8_linux_48</item>
+        <item>icons8_location_48</item>
+        <item>icons8_nfc_48</item>
+        <item>icons8_playstore_48</item>
+        <item>icons8_rockstar_games_48</item>
+        <item>icons8_snapchat_48</item>
+        <item>icons8_speaker_48</item>
+        <item>icons8_system_report_48</item>
+        <item>icons8_whatsapp_48</item>
+        <item>icons8_rotate_right_48</item>
+        <item>icons8_circled_6_48</item>
+        <item>icons8_circled_t_48</item>
+        <item>icons8_speech_48</item>
+    </string-array>
+</resources>

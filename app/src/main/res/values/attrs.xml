@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="DragGridView">
+        <attr name="android:text"/>
+        <attr name="android:numColumns"/>
+        <attr name="android:listSelector"/>
+        <attr name="mode" format="enum">
+            <enum name="auto" value="0"/>
+            <enum name="exactly" value="1"/>
+        </attr>
+    </declare-styleable>
+</resources>
